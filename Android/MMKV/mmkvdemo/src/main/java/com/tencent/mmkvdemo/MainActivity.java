@@ -32,20 +32,14 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
-import com.getkeepsafe.relinker.ReLinker;
 import com.tencent.mmkv.MMKV;
-import com.tencent.mmkv.MMKVContentChangeNotification;
-import com.tencent.mmkv.MMKVHandler;
-import com.tencent.mmkv.MMKVLogLevel;
-import com.tencent.mmkv.MMKVRecoverStrategic;
 import com.tencent.mmkv.NativeBuffer;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import org.jetbrains.annotations.Nullable;
 
-public class MainActivity
-    extends AppCompatActivity implements MMKVHandler, MMKVContentChangeNotification {
+public class MainActivity extends AppCompatActivity {
     static private final String KEY_1 = "Ashmem_Key_1";
     static private final String KEY_2 = "Ashmem_Key_2";
     @Override
@@ -53,27 +47,8 @@ public class MainActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // set root dir
-        //String rootDir = MMKV.initialize(this);
-        String dir = getFilesDir().getAbsolutePath() + "/mmkv";
-        String rootDir = MMKV.initialize(dir, new MMKV.LibLoader() {
-            @Override
-            public void loadLibrary(String libName) {
-                ReLinker.loadLibrary(MainActivity.this, libName);
-            }
-        }, MMKVLogLevel.LevelInfo);
-        Log.i("MMKV", "mmkv root: " + rootDir);
-
-        // set log level
-        MMKV.setLogLevel(MMKVLogLevel.LevelInfo);
-
-        // you can turn off logging
-        //MMKV.setLogLevel(MMKVLogLevel.LevelNone);
-
-        MMKV.registerHandler(this);
-        MMKV.registerContentChangeNotify(this);
-
         TextView tv = (TextView) findViewById(R.id.sample_text);
+        String rootDir = MMKV.getRootDir();
         tv.setText(rootDir);
 
         final Button button = findViewById(R.id.button);
@@ -83,7 +58,7 @@ public class MainActivity
             public void onClick(View v) {
                 baseline.mmkvBaselineTest();
                 baseline.sharedPreferencesBaselineTest();
-                baseline.sqliteBaselineTest();
+                baseline.sqliteBaselineTest(true);
 
                 //testInterProcessReKey();
                 //testInterProcessLockPhase2();
@@ -140,16 +115,11 @@ public class MainActivity
         //testInterProcessLockPhase1();
         //testCornerSize();
         //testFastRemoveCornerSize();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        MMKV.onExit();
+        //testTrimNonEmptyInterProcess();
     }
 
     private void testInterProcessLogic() {
-        MMKV mmkv = MMKV.mmkvWithID(MyService.MMKV_ID, MMKV.MULTI_PROCESS_MODE);
+        MMKV mmkv = MMKV.mmkvWithID(MyService.MMKV_ID, MMKV.MULTI_PROCESS_MODE, MyService.CryptKey);
         mmkv.putInt(MyService.CMD_ID, 1024);
         Log.d("mmkv in main", "" + mmkv.decodeInt(MyService.CMD_ID));
 
@@ -206,8 +176,7 @@ public class MainActivity
         }
         byte[] bytes = kv.decodeBytes("bytes");
         Log.i("MMKV", "bytes: " + new String(bytes));
-        Log.i("MMKV", "bytes length = " + bytes.length
-                          + ", value size consumption = " + kv.getValueSize("bytes")
+        Log.i("MMKV", "bytes length = " + bytes.length + ", value size consumption = " + kv.getValueSize("bytes")
                           + ", value size = " + kv.getValueActualSize("bytes"));
 
         int sizeNeeded = kv.getValueActualSize("bytes");
@@ -224,7 +193,7 @@ public class MainActivity
         }
         TestParcelable result = kv.decodeParcelable("parcel", TestParcelable.class);
         if (result != null) {
-            Log.d("MMKV", "parcel: " + result.iValue + ", " + result.sValue);
+            Log.d("MMKV", "parcel: " + result.iValue + ", " + result.sValue + ", " + result.list);
         } else {
             Log.e("MMKV", "fail to decodeParcelable of key:parcel");
         }
@@ -284,8 +253,7 @@ public class MainActivity
         Log.i("MMKV", "double: " + kv.decodeDouble("double"));
         Log.i("MMKV", "string: " + kv.getString("string", null));
         Log.i("MMKV", "string-set: " + kv.getStringSet("string-set", null));
-        Log.i("MMKV",
-              "linked-string-set: " + kv.decodeStringSet("string-set", null, LinkedHashSet.class));
+        Log.i("MMKV", "linked-string-set: " + kv.decodeStringSet("string-set", null, LinkedHashSet.class));
     }
 
     private void testReKey() {
@@ -320,8 +288,7 @@ public class MainActivity
 
     private void testAshmem() {
         String cryptKey = "Tencent MMKV";
-        MMKV kv = MMKV.mmkvWithAshmemID(this, "testAshmem", MMKV.pageSize(),
-                                        MMKV.SINGLE_PROCESS_MODE, cryptKey);
+        MMKV kv = MMKV.mmkvWithAshmemID(this, "testAshmem", MMKV.pageSize(), MMKV.SINGLE_PROCESS_MODE, cryptKey);
 
         kv.encode("bool", true);
         Log.i("MMKV", "bool: " + kv.decodeBool("bool"));
@@ -368,8 +335,7 @@ public class MainActivity
 
     private void prepareInterProcessAshmemByContentProvider(String cryptKey) {
         // first of all, init ashmem mmkv in main process
-        MMKV.mmkvWithAshmemID(this, AshmemMMKV_ID, AshmemMMKV_Size, MMKV.MULTI_PROCESS_MODE,
-                              cryptKey);
+        MMKV.mmkvWithAshmemID(this, AshmemMMKV_ID, AshmemMMKV_Size, MMKV.MULTI_PROCESS_MODE, cryptKey);
 
         // then other process can get by ContentProvider
         Intent intent = new Intent(this, MyService.class);
@@ -382,8 +348,7 @@ public class MainActivity
     }
 
     private void testInterProcessReKey() {
-        MMKV mmkv = MMKV.mmkvWithAshmemID(this, AshmemMMKV_ID, AshmemMMKV_Size,
-                                          MMKV.MULTI_PROCESS_MODE, KEY_1);
+        MMKV mmkv = MMKV.mmkvWithAshmemID(this, AshmemMMKV_ID, AshmemMMKV_Size, MMKV.MULTI_PROCESS_MODE, KEY_1);
         mmkv.reKey(KEY_2);
 
         prepareInterProcessAshmemByContentProvider(KEY_2);
@@ -463,45 +428,20 @@ public class MainActivity
         }
     }
 
-    @Override
-    public MMKVRecoverStrategic onMMKVCRCCheckFail(String mmapID) {
-        return MMKVRecoverStrategic.OnErrorRecover;
-    }
+    private void testTrimNonEmptyInterProcess() {
+        MMKV mmkv = MMKV.mmkvWithID("trimNonEmptyInterProcess", MMKV.MULTI_PROCESS_MODE);
+        mmkv.clearAll();
+        mmkv.encode("NonEmptyKey", "Hello, world!");
+        byte[] value = new byte[MMKV.pageSize()];
+        mmkv.encode("largeKV", value);
+        mmkv.removeValueForKey("largeKV");
+        mmkv.trim();
 
-    @Override
-    public MMKVRecoverStrategic onMMKVFileLengthError(String mmapID) {
-        return MMKVRecoverStrategic.OnErrorRecover;
-    }
+        Intent intent = new Intent(this, MyService.class);
+        intent.putExtra(BenchMarkBaseService.CMD_ID, MyService.CMD_TRIM_FINISH);
+        startService(intent);
 
-    @Override
-    public boolean wantLogRedirecting() {
-        return true;
-    }
-
-    @Override
-    public void mmkvLog(MMKVLogLevel level, String file, int line, String func, String message) {
-        String log = "<" + file + ":" + line + "::" + func + "> " + message;
-        switch (level) {
-            case LevelDebug:
-                Log.d("redirect logging MMKV", log);
-                break;
-            case LevelInfo:
-                Log.i("redirect logging MMKV", log);
-                break;
-            case LevelWarning:
-                Log.w("redirect logging MMKV", log);
-                break;
-            case LevelError:
-                Log.e("redirect logging MMKV", log);
-                break;
-            case LevelNone:
-                Log.e("redirect logging MMKV", log);
-                break;
-        }
-    }
-
-    @Override
-    public void onContentChangedByOuterProcess(String mmapID) {
-        Log.i("content changed", mmapID);
+        SystemClock.sleep(1000 * 3);
+        Log.i("MMKV", "NonEmptyKey: " + mmkv.decodeString("NonEmptyKey"));
     }
 }

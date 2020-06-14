@@ -1,13 +1,12 @@
 apply from: rootProject.file('gradle/build_library.gradle')
 
 android {
-    defaultPublishConfig "StaticCppRelease"
-//    defaultPublishConfig "SharedCppRelease"
+//    defaultPublishConfig "StaticCppRelease"
+    defaultPublishConfig "SharedCppRelease"
     defaultConfig {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                cppFlags "-std=c++1z -fno-exceptions"
                 abiFilters 'armeabi', 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
             }
         }
@@ -33,6 +32,7 @@ android {
     externalNativeBuild {
         cmake {
             path "CMakeLists.txt"
+            version "3.8.0+"
         }
     }
 
@@ -59,9 +59,14 @@ android {
     }
 }
 
+configurations {
+    javadocDeps
+}
+
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'androidx.annotation:annotation:1.0.2'
+    implementation 'androidx.annotation:annotation:1.1.0'
+    javadocDeps 'androidx.annotation:annotation:1.1.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.2.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'

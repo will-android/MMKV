@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
 
   s.name         = "MMKV"
-  s.version      = "1.0.23"
+  s.version      = "1.1.2"
   s.summary      = "MMKV is a cross-platform key-value storage framework developed by WeChat."
 
   s.description  = <<-DESC
@@ -18,11 +18,10 @@ Pod::Spec.new do |s|
   s.osx.deployment_target = "10.9"
 
   s.source       = { :git => "https://github.com/Tencent/MMKV.git", :tag => "v#{s.version}" }
-  s.source_files =  "iOS/MMKV/MMKV", "iOS/MMKV/MMKV/*.{h,mm,hpp}", "iOS/MMKV/MMKV/aes/*", "iOS/MMKV/MMKV/aes/openssl/*"
+  s.source_files =  "iOS/MMKV/MMKV", "iOS/MMKV/MMKV/*.{h,mm,hpp}"
   s.public_header_files = "iOS/MMKV/MMKV/MMKV.h", "iOS/MMKV/MMKV/MMKVHandler.h"
 
   s.framework    = "CoreFoundation"
-  s.ios.frameworks = "UIKit"
   s.libraries    = "z", "c++"
   s.requires_arc = true
   s.pod_target_xcconfig = {
@@ -31,4 +30,7 @@ Pod::Spec.new do |s|
     "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF" => "NO",
   }
 
+  s.dependency 'MMKVCore', '~> 1.1.2'
+
 end
+
